@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>動画デジタル化シミュレータ</title>
+<meta name="description" content="動画はフレーム（静止画）の連続．パラパラまんがで動きを確かめ，1フレームのデータ量とフレームレート（fps）から動画のデータ量を求める授業用のシミュレータ．">
+<style>
+  :root {
+    /* 画素の解剖器・サンプリング実験器と同じ：原稿用紙の緑と，蛍光ペンの黄色 */
+    --paper: #F4F6F0;
+    --sheet: #FFFFFF;
+    --leaf: #2E7D5B;
+    --leaf-deep: #1D5B41;
+    --leaf-soft: #E3F1E8;
+    --leaf-line: #D2E4D9;
+    --ink: #1F2A24;
+    --ink-soft: #5E6C65;
+    --pen: #FFE27A;
+    --pen-soft: #FFF4C7;
+    --shu: #BD472C;
+    --shu-soft: #FBE8E2;
+    --sky: #2F5D8A;
+
+    --font-body: "BIZ UDPGothic", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans JP", "Noto Sans CJK JP", sans-serif;
+    --font-code: "BIZ UDGothic", "Osaka-Mono", "MS Gothic", "Noto Sans Mono CJK JP", ui-monospace, "Menlo", "Consolas", monospace;
+
+    --step--1: 0.8125rem;
+    --step-0: 1rem;
+    --step-1: 1.1875rem;
+    --step-2: 1.5rem;
+    --step-3: 2rem;
+    --step-4: 2.5rem;
+
+    --radius: 10px;
+    --gutter: clamp(1rem, 4vw, 2.5rem);
+    --shadow: 0 1px 2px rgba(31, 42, 36, 0.05), 0 10px 30px rgba(31, 42, 36, 0.05);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0); line-height: 1.8; }
+  :focus-visible { outline: 3px solid var(--leaf); outline-offset: 2px; }
+  .page { max-width: 72rem; margin: 0 auto; padding: 0 var(--gutter) 4rem; }
+
+  /* ---------- 見出し ---------- */
+  .masthead { display: grid; gap: 0.6rem; padding: 2.5rem 0 1.5rem; }
+  .kicker { margin: 0; font-size: var(--step--1); letter-spacing: 0.1em; color: var(--leaf-deep); }
+  h1 { margin: 0; font-weight: 700; font-size: clamp(var(--step-3), 5vw, var(--step-4)); line-height: 1.3; letter-spacing: 0.02em; word-break: keep-all; overflow-wrap: anywhere; }
+  .marker { background: linear-gradient(transparent 62%, var(--pen) 62%); padding: 0 0.1em; }
+  .lede { margin: 0; max-width: 40em; color: var(--ink-soft); }
+
+  /* ---------- タブ ---------- */
+  .tabbar { display: flex; flex-wrap: wrap; gap: 0.6rem 1.2rem; align-items: center; margin-bottom: 1rem; }
+  .tabs { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; padding: 0.35rem; background: var(--sheet); border-radius: 999px; box-shadow: var(--shadow); max-width: 100%; }
+  .tab { appearance: none; border: 0; background: transparent; color: var(--ink-soft); font: inherit; padding: 0.45rem 1.2rem; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+  .tab:hover { color: var(--ink); background: var(--paper); }
+  .tab[aria-selected="true"] { background: var(--leaf); color: var(--sheet); font-weight: 700; }
+
+  .panel { background: var(--sheet); border-radius: 16px; box-shadow: var(--shadow); padding: clamp(1.25rem, 3vw, 2.25rem); display: grid; gap: 1.5rem; }
+  .panel > *, .body > * { min-width: 0; }
+  .body { display: grid; gap: 1.5rem; }
+  .panel-intro { margin: 0; max-width: 46em; }
+  h2 { margin: 0; font-size: var(--step-1); }
+  h3 { margin: 0; font-size: var(--step-0); }
+
+  /* ---------- 操作部 ---------- */
+  .field { display: grid; gap: 0.3rem; min-width: 0; }
+  .field-label { font-size: var(--step--1); color: var(--ink-soft); }
+  .row { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; }
+  select, input[type="number"], input[type="text"] {
+    font: inherit; font-size: var(--step-0); color: var(--ink); background: var(--sheet);
+    border: 1.5px solid var(--leaf-line); border-radius: var(--radius);
+    padding: 0.35rem 0.7rem; min-height: 2.6rem; max-width: 100%;
+  }
+  select:hover, input[type="number"]:hover { border-color: var(--leaf); }
+  input[type="number"] { width: 9rem; font-family: var(--font-code); }
+  input[type="range"] { width: 100%; accent-color: var(--leaf); min-height: 2rem; }
+  .value { font-family: var(--font-code); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .btn { appearance: none; font: inherit; font-weight: 700; border-radius: var(--radius); min-height: 2.8rem; padding: 0.45rem 1.2rem; cursor: pointer; border: 1.5px solid var(--leaf); }
+  .btn-primary { background: var(--leaf); color: var(--sheet); }
+  .btn-primary:hover { background: var(--leaf-deep); border-color: var(--leaf-deep); }
+  .btn-secondary { background: var(--sheet); color: var(--leaf-deep); }
+  .btn-secondary:hover { background: var(--leaf-soft); }
+  .btn[aria-pressed="true"] { background: var(--pen); border-color: var(--ink); color: var(--ink); }
+  .btn:disabled { opacity: 0.45; cursor: default; }
+  .btn-small { min-height: 2.3rem; padding: 0.2rem 0.8rem; font-size: var(--step--1); }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+  .small-label { font-size: var(--step--1); color: var(--ink-soft); margin-right: 0.2rem; }
+  .chip { appearance: none; font: inherit; font-size: var(--step--1); background: var(--paper); color: var(--ink); border: 0; border-radius: 999px; padding: 0.3rem 0.85rem; cursor: pointer; min-height: 2.2rem; }
+  .chip:hover { background: var(--pen); }
+  .chip[aria-pressed="true"] { background: var(--leaf-deep); color: var(--sheet); font-weight: 700; }
+
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
+  .seg button { appearance: none; font: inherit; font-size: var(--step--1); background: var(--paper); color: var(--ink-soft); border: 0; border-radius: 999px; padding: 0.3rem 0.9rem; cursor: pointer; min-height: 2.2rem; }
+  .seg button:hover { color: var(--ink); }
+  .seg button[aria-pressed="true"] { background: var(--leaf-deep); color: var(--sheet); font-weight: 700; }
+
+  .check { display: inline-flex; gap: 0.35rem; align-items: center; font-size: var(--step--1); cursor: pointer; }
+  .check input { accent-color: var(--leaf); width: 1.05rem; height: 1.05rem; }
+
+  .note { margin: 0; font-size: var(--step--1); color: var(--ink-soft); max-width: 50em; }
+  .note strong { color: var(--ink); }
+  .warn { margin: 0; font-size: var(--step--1); color: var(--shu); }
+  .warn:empty { display: none; }
+
+  /* ---------- 図 ---------- */
+  canvas { display: block; width: 100%; }
+  .chart { border: 1px solid var(--leaf-line); border-radius: 12px; background: var(--sheet); padding: 0.5rem; }
+  .card { border: 1.5px solid var(--leaf-line); border-radius: 14px; padding: 1rem; display: grid; gap: 0.9rem; min-width: 0; align-content: start; }
+  .card-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .badge { display: inline-grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--leaf); color: var(--sheet); font-weight: 700; }
+  .compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 1.25rem; }
+  .ratio { margin: 0; padding: 0.7rem 1rem; border-radius: 12px; background: var(--pen-soft); font-variant-numeric: tabular-nums; }
+  .formula { margin: 0; padding: 0.9rem 1.1rem; border-radius: 12px; background: var(--leaf-soft); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .formula .eq { font-family: var(--font-code); font-weight: 700; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: 0.6rem; margin: 0; }
+  .facts div { background: var(--paper); border-radius: 10px; padding: 0.5rem 0.8rem; min-width: 0; }
+  .facts dt { font-size: var(--step--1); color: var(--ink-soft); }
+  .facts dd { margin: 0; font-family: var(--font-code); font-weight: 700; font-size: var(--step-1); overflow-wrap: anywhere; }
+  .facts dd small { display: block; font-size: var(--step--1); font-weight: 400; color: var(--ink-soft); font-family: var(--font-body); }
+
+  .calc-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: 1rem; align-items: end; }
+  .calc-inputs input[type="number"] { width: 100%; }
+  .steps { display: grid; gap: 0.35rem; margin: 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+  .steps li { display: grid; grid-template-columns: 13rem 1fr; gap: 0.75rem; align-items: baseline; padding: 0.45rem 0.9rem; border-radius: 10px; background: var(--paper); }
+  .steps li span:first-child { color: var(--ink-soft); font-size: var(--step--1); }
+  .steps li strong { font-family: var(--font-code); font-size: var(--step-1); overflow-wrap: anywhere; }
+  .steps li strong small { font-size: var(--step--1); font-weight: 400; color: var(--ink-soft); font-family: var(--font-body); }
+  .steps.accent li { background: var(--leaf-soft); }
+
+  /* ---------- パラパラまんが ---------- */
+  .flip-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  .side { display: grid; gap: 1rem; min-width: 0; }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: 0.5rem; }
+  .thumb { appearance: none; font: inherit; border: 2px solid var(--leaf-line); border-radius: 10px; background: var(--sheet); padding: 0.2rem; cursor: pointer; display: grid; gap: 0.1rem; text-align: center; font-size: 0.72rem; color: var(--ink-soft); }
+  .thumb canvas { border-radius: 6px; height: auto; aspect-ratio: 4 / 3; }
+  .thumb[aria-pressed="true"] { border-color: var(--ink); background: var(--pen-soft); color: var(--ink); font-weight: 700; }
+
+  .hide-cover { margin: 0; padding: 1.2rem 1.4rem; border-radius: 12px; background: var(--pen-soft); }
+  .hide-num .num-only { display: none !important; }
+
+  footer { margin-top: 2rem; font-size: var(--step--1); color: var(--ink-soft); }
+
+  @media (max-width: 52rem) { .flip-layout { grid-template-columns: 1fr; } }
+  @media (max-width: 40rem) {
+    .steps li { grid-template-columns: 1fr; gap: 0; }
+    .tab { padding: 0.4rem 0.8rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+<div class="page" id="page">
+
+  <header class="masthead">
+    <p class="kicker">情報Ⅰ　情報のデジタル表現　第6回</p>
+    <h1><span class="marker">動画</span>の<wbr>デジタル化<wbr>シミュレータ</h1>
+    <p class="lede">動画は，静止画を連続して見せたものです．パラパラまんがで動きを確かめ，1枚の画像のデータ量から，動画のデータ量を求めてみよう．</p>
+  </header>
+
+  <div class="tabbar">
+    <nav class="tabs" role="tablist" aria-label="機能の切り替え">
+      <button class="tab" role="tab" id="tab-flip" aria-controls="panel-flip" aria-selected="true" data-hash="flip">パラパラまんが</button>
+      <button class="tab" role="tab" id="tab-frame" aria-controls="panel-frame" aria-selected="false" tabindex="-1" data-hash="frame">1フレームのデータ量</button>
+      <button class="tab" role="tab" id="tab-movie" aria-controls="panel-movie" aria-selected="false" tabindex="-1" data-hash="movie">動画のデータ量</button>
+      <button class="tab" role="tab" id="tab-compare" aria-controls="panel-compare" aria-selected="false" tabindex="-1" data-hash="compare">比べる</button>
+    </nav>
+    <label class="check"><input type="checkbox" id="hide-num">数字をかくす（導入で使う．教員用）</label>
+  </div>
+
+  <main>
+    <!-- ===== パラパラまんが ===== -->
+    <section class="panel" id="panel-flip" role="tabpanel" aria-labelledby="tab-flip">
+      <p class="panel-intro" id="flip-intro" data-hide="絵が，つぎつぎに切り替わります．めくる速さを変えて，動きの見え方がどう変わるか，観察しよう．">動画は，静止画を連続的に表示したものです．動画を構成している1枚1枚の画像を<strong>フレーム</strong>（パラパラまんがの1コマ），1秒あたりに再生するフレーム数を<strong>フレームレート</strong>（単位は <strong>fps</strong>）といいます．フレームレートを変えて，動きの見え方を確かめよう．</p>
+
+      <div class="flip-layout">
+        <div class="field">
+          <span class="field-label" data-hide="いまの絵（押すか，矢印キーでも切り替えられます）">いまのフレーム（押すか，矢印キーでも切り替えられます）</span>
+          <div class="chart"><canvas id="flip-canvas" tabindex="0" aria-label="パラパラまんがの絵．左右の矢印キーで1コマずつ送ります"></canvas></div>
+          <p class="formula num-only" id="flip-status" aria-live="off"></p>
+        </div>
+        <div class="side">
+          <div class="field">
+            <span class="field-label">絵の種類</span>
+            <div class="seg" role="group" aria-label="絵の種類" id="f-anim">
+              <button type="button" data-anim="ball" aria-pressed="true">はねるボール</button>
+              <button type="button" data-anim="pendulum" aria-pressed="false">ふりこ</button>
+              <button type="button" data-anim="car" aria-pressed="false">走る車</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label" data-hide="絵の枚数">コマ数（全部で何フレームか）</span>
+            <div class="seg" role="group" aria-label="絵の枚数" id="f-n"></div>
+          </div>
+          <div class="field">
+            <span class="field-label" id="f-fps-label" data-hide="めくる速さ">フレームレート（1秒に再生するフレーム数）：<span class="value" id="f-fps-val">5</span> fps</span>
+            <input type="range" id="f-fps" min="1" max="60" step="1" value="5" aria-labelledby="f-fps-label">
+            <div class="presets num-only" id="f-fps-chips"><span class="small-label">例：</span></div>
+          </div>
+          <div class="btnrow">
+            <button type="button" class="btn btn-secondary" id="f-prev">前へ</button>
+            <button type="button" class="btn btn-primary" id="f-play">とめる</button>
+            <button type="button" class="btn btn-secondary" id="f-next">次へ</button>
+          </div>
+          <p class="note" data-hide="とめるとコマ送りができます．下の絵を押すと，その絵で止まります．">止めると，コマ送り（前へ／次へ）ができます．下のフレームを押すと，そのフレームで止まります．</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label" data-hide="すべての絵（めくる順）">すべてのフレーム（めくる順）</span>
+        <div class="strip" id="f-strip"></div>
+      </div>
+      <p class="note num-only">動画は，このように 1枚1枚のフレーム（静止画）を，1秒間に何枚も再生してつくります．テレビやビデオでは約30fps あるいは約60fps，フィルム映画では24fps のものが多いです．</p>
+    </section>
+
+    <!-- ===== 1フレームのデータ量 ===== -->
+    <section class="panel" id="panel-frame" role="tabpanel" aria-labelledby="tab-frame" hidden>
+      <p class="hide-cover" data-cover hidden>かくしモードです．この画面は，数字と式を隠しています．上の「数字をかくす」のチェックを外すと使えます．</p>
+      <div class="body" data-body>
+        <p class="panel-intro">動画の1フレームは，静止画1枚です．1フレームのデータ量は，第5回の画像のデータ量と同じ計算で求めます．<strong>データ量（ビット）＝横の画素数 × 縦の画素数 × 1画素のビット数</strong>．解像度と色の方式を選んで，ビット → バイト → KB → MB と単位を換えて確かめよう（1バイト＝8ビット，1KB＝1024バイト，1MB＝1024KB）．</p>
+        <div id="set-frame" class="body"></div>
+        <ol class="steps" id="fr-steps"></ol>
+        <ol class="steps accent" id="fr-forms"></ol>
+        <p class="formula" id="fr-mode"></p>
+        <div class="field">
+          <span class="field-label">解像度の大きさ比べ（左上をそろえて重ねています．いま選んでいる大きさは黄色）</span>
+          <div class="chart"><canvas id="fr-sizes" aria-label="解像度の大きさ比べの図"></canvas></div>
+        </div>
+        <p class="note">計算は丸めずに行い，表示のときだけ小数第2位までにしています．割り切れるときは「＝」，割り切れないときは「≒」で書きます．</p>
+      </div>
+    </section>
+
+    <!-- ===== 動画のデータ量 ===== -->
+    <section class="panel" id="panel-movie" role="tabpanel" aria-labelledby="tab-movie" hidden>
+      <p class="hide-cover" data-cover hidden>かくしモードです．この画面は，数字と式を隠しています．上の「数字をかくす」のチェックを外すと使えます．</p>
+      <div class="body" data-body>
+        <p class="panel-intro"><strong>動画のデータ量 ＝ 1フレームのデータ量 × フレームレート（fps）× 時間（秒）</strong>．1フレームのデータ量に，1秒あたりのフレーム数と，動画の長さ（秒）をかけます．手で計算したあとの答え合わせに使おう．</p>
+        <div class="presets">
+          <span class="small-label">授業の問題：</span>
+          <button type="button" class="chip" data-mp="1024,768,24,30,3,min">例題11(2)：1024×768・24ビット・30fps・3分</button>
+          <button type="button" class="chip" data-mp="1280,720,24,30,60,s">確認問題8：1280×720・24ビット・30fps・1分</button>
+          <button type="button" class="chip" data-mp="3840,2160,24,60,10,min">4K：3840×2160・24ビット・60fps・10分</button>
+        </div>
+        <div id="set-movie" class="body"></div>
+        <dl class="facts" id="mv-facts"></dl>
+        <ol class="steps" id="mv-steps"></ol>
+        <ol class="steps accent" id="mv-forms"></ol>
+        <p class="note">計算は丸めずに行い，表示のときだけ小数第2位までにしています．1KB＝1024バイト，1MB＝1024KB，1GB＝1024MB（教科書と同じ）．1000ごとに区切ることもあります．</p>
+      </div>
+    </section>
+
+    <!-- ===== 比べる ===== -->
+    <section class="panel" id="panel-compare" role="tabpanel" aria-labelledby="tab-compare" hidden>
+      <p class="hide-cover" data-cover hidden>かくしモードです．この画面は，数字と式を隠しています．上の「数字をかくす」のチェックを外すと使えます．</p>
+      <div class="body" data-body>
+        <p class="panel-intro">2つの設定の動画のデータ量を並べて，<strong>何倍になるか</strong>を比べます．解像度，色の方式，フレームレート，時間のうち，どれを変えると，データ量がどれだけ変わるかを確かめよう．</p>
+        <div class="presets">
+          <span class="small-label">B を変える：</span>
+          <button type="button" class="chip" data-cp="same">A と同じにする</button>
+          <button type="button" class="chip" data-cp="fps2">フレームレートを2倍</button>
+          <button type="button" class="chip" data-cp="res2">縦も横も2倍</button>
+          <button type="button" class="chip" data-cp="time2">時間を2倍</button>
+          <button type="button" class="chip" data-cp="gray">グレースケールにする</button>
+          <button type="button" class="chip" data-cp="k4">4K・60fps・10分にする</button>
+        </div>
+        <div class="compare">
+          <article class="card"><div class="card-head"><span class="badge">A</span><h2>設定 A</h2></div><div id="set-A" class="body"></div><dl class="facts" id="cmp-A"></dl></article>
+          <article class="card"><div class="card-head"><span class="badge">B</span><h2>設定 B</h2></div><div id="set-B" class="body"></div><dl class="facts" id="cmp-B"></dl></article>
+        </div>
+        <p class="ratio" id="cmp-ratio" aria-live="polite"></p>
+        <ol class="steps accent" id="cmp-break"></ol>
+      </div>
+    </section>
+  </main>
+
+  <footer>情報Ⅰ「情報のデジタル表現」の授業用．用語は実教出版『最新情報Ⅰ』に合わせています．動画ファイルは読み込まず，音も出しません．絵はこのブラウザの中で描いています．</footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const C = {};
+  for (const k of ["leaf", "leaf-deep", "leaf-soft", "leaf-line", "ink", "ink-soft", "shu", "sky", "paper", "pen", "sheet"]) C[k] = css("--" + k);
+  const SUPD = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+  const sup = (n) => String(n).replace(/\d/g, (d) => SUPD[d]);
+  const FONT = (px, w = "") => `${w} ${px}px ${css("--font-body")}`.trim();
+  const gcd = (a, b) => { while (b) { [a, b] = [b, a % b]; } return a; };
+
+  // =====================================================================
+  //  設定と計算（丸めは表示の最後に1回だけ）
+  // =====================================================================
+  const MAXP = 20000, MAXFPS = 120, MAXMIN = 60, MAXSEC = MAXMIN * 60;
+  const RES = [[16, 16], [320, 240], [1024, 768], [1280, 720], [1920, 1080], [3840, 2160]];
+  const MODES = [
+    { bits: 1, name: "白黒（1ビット・2階調）", note: "1画素 ＝ 1ビット（2¹ ＝ 2 階調．白と黒の2色）" },
+    { bits: 8, name: "グレースケール（8ビット・256階調）", note: "1画素 ＝ 8ビット（2⁸ ＝ 256 階調．黒から白までの256段階）" },
+    { bits: 24, name: "24ビットフルカラー", note: "1画素 ＝ 8ビット × 3（赤・緑・青）＝ 24ビット（2²⁴ ＝ 16777216 色）" },
+  ];
+  const mk = (o = {}) => ({ w: 1024, h: 768, bits: 24, fps: 30, tv: 3, tu: "min", ...o });
+  const secOf = (s) => s.tv * (s.tu === "min" ? 60 : 1);
+  const frameBits = (s) => s.w * s.h * s.bits;
+  const totalBits = (s) => frameBits(s) * s.fps * secOf(s);
+
+  // num ÷ 2^pow：ちょうど割り切れるか，小数第2位で割り切れれば「＝」，そうでなければ「≒」（小数第2位）
+  function decimal(num, pow) {
+    const den = 2 ** pow, q = Math.floor(num / den), rem = num - q * den, x = num / den;
+    if (rem === 0) return { exact: true, text: String(q), x };
+    if ((rem * 100) % den === 0) return { exact: true, text: String(+x.toFixed(2)), x };
+    const text = x >= 0.01 ? x.toFixed(2) : x.toFixed(Math.min(20, 1 - Math.floor(Math.log10(x))));
+    return { exact: false, text, x, one: x >= 0.1 ? x.toFixed(1) : null, int: x >= 1 ? x.toFixed(0) : null };
+  }
+  // num ÷ 2^pow を丸めずに小数で書く（2のべき乗で割るので必ず割り切れる）
+  function exactDec(num, pow) {
+    const den = 2 ** pow, ip = Math.floor(num / den);
+    let r = num - ip * den, frac = "";
+    while (r !== 0) { r *= 10; const d = Math.floor(r / den); frac += d; r -= d * den; }
+    return frac ? `${ip}.${frac}` : String(ip);
+  }
+  const eqText = (d, unit, withInt = false) => {
+    let t = `${d.exact ? "＝" : "≒"} ${d.text} ${unit}`;
+    if (!d.exact) {
+      const sub = [];
+      if (d.one && d.one !== d.text) sub.push(`小数第1位で ${d.one} ${unit}`);
+      if (withInt && d.int && d.int !== d.one) sub.push(`整数で ${d.int} ${unit}`);
+      if (sub.length) t += `（${sub.join("，")}）`;
+    }
+    return t;
+  };
+  const approx = (d) => `${d.exact ? "" : "≒ "}${d.text}`;
+  const row = (label, html, cls = "") => `<li class="${cls}"><span>${label}</span><strong>${html}</strong></li>`;
+  const timeText = (s) => (s.tu === "min" ? `${s.tv} 分（${secOf(s)} 秒）` : `${s.tv} 秒`);
+
+  // =====================================================================
+  //  設定欄（②③④で共通の部品）
+  // =====================================================================
+  const comps = [];
+  function settings(root, st, movie) {
+    const modeSeg = MODES.map((m) => `<button type="button" data-bits="${m.bits}" aria-pressed="false">${m.name}</button>`).join("");
+    root.innerHTML = `
+      <div class="field"><span class="field-label">解像度（横の画素数 × 縦の画素数）</span><div class="presets" data-k="res"></div></div>
+      <div class="calc-inputs">
+        <label class="field"><span class="field-label">横の画素数（1〜${MAXP}）</span><input type="number" data-k="w" min="1" max="${MAXP}" step="1" inputmode="numeric"></label>
+        <label class="field"><span class="field-label">縦の画素数（1〜${MAXP}）</span><input type="number" data-k="h" min="1" max="${MAXP}" step="1" inputmode="numeric"></label>
+      </div>
+      <div class="field"><span class="field-label">色の方式（1画素のビット数）</span><div class="seg" role="group" aria-label="色の方式" data-k="bits">${modeSeg}</div></div>
+      ${movie ? `
+      <div class="calc-inputs">
+        <label class="field"><span class="field-label">フレームレート（fps．1〜${MAXFPS}）</span><input type="number" data-k="fps" min="1" max="${MAXFPS}" step="1" inputmode="numeric"></label>
+        <label class="field"><span class="field-label">時間（1〜<span data-k="tmax"></span>）</span><input type="number" data-k="tv" min="1" step="1" inputmode="numeric"></label>
+        <div class="field"><span class="field-label">時間の単位</span><div class="seg" role="group" aria-label="時間の単位" data-k="tu"><button type="button" data-tu="s" aria-pressed="false">秒</button><button type="button" data-tu="min" aria-pressed="false">分</button></div></div>
+      </div>
+      <div class="presets"><span class="small-label">フレームレートの例：</span>${[24, 30, 60].map((f) => `<button type="button" class="chip" data-fps="${f}">${f} fps</button>`).join("")}</div>` : ""}
+      <p class="warn" data-k="warn" aria-live="polite"></p>`;
+    const q = (k) => $(`[data-k=${k}]`, root);
+    const warn = (t) => { q("warn").textContent = t; };
+    const resBox = q("res");
+    RES.forEach(([w, h]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.dataset.res = `${w},${h}`; b.textContent = `${w}×${h}`;
+      b.addEventListener("click", () => { st.w = w; st.h = h; warn(""); refresh(); });
+      resBox.appendChild(b);
+    });
+    $$("[data-bits]", root).forEach((b) => b.addEventListener("click", () => { st.bits = Number(b.dataset.bits); refresh(); }));
+    const limits = {
+      w: [1, () => MAXP, "横の画素数"], h: [1, () => MAXP, "縦の画素数"],
+      fps: [1, () => MAXFPS, "フレームレート"], tv: [1, () => (st.tu === "min" ? MAXMIN : MAXSEC), "時間"],
+    };
+    for (const key of Object.keys(limits)) {
+      const el = q(key);
+      if (!el) continue;
+      const [lo, hiF, name] = limits[key];
+      let entry = st[key];
+      const read = () => {
+        const s = el.value.trim(), hi = hiF();
+        if (/^[0-9]+$/.test(s) && Number(s) >= lo && Number(s) <= hi) { st[key] = Number(s); warn(""); return true; }
+        const why = s === "" ? "空です" : /^[0-9]+$/.test(s) && Number(s) === 0 ? "0は使えません" : /^[0-9]+$/.test(s) ? `${hi}を超えています` : /^[0-9]*[.,][0-9]+$/.test(s) ? "小数は使えません" : "数字として読めません";
+        warn(`${name}：${why}．${lo}〜${hi}の整数を入れてください（いまは ${st[key]} で計算しています）．`);
+        return false;
+      };
+      el.addEventListener("focus", () => { entry = st[key]; });
+      el.addEventListener("input", () => { if (read()) refresh(el); });
+      const fix = () => {
+        if (el.value === String(st[key])) return;
+        if (!read()) { st[key] = entry; warn(`${name}に使えない値だったので，欄に入る前の値（${entry}）に戻しました．入れられるのは${lo}〜${hiF()}の整数です．`); }
+        entry = st[key]; refresh();
+      };
+      el.addEventListener("change", fix); el.addEventListener("blur", fix);
+    }
+    if (movie) {
+      $$("[data-tu]", root).forEach((b) => b.addEventListener("click", () => {
+        st.tu = b.dataset.tu; st.tv = Math.min(st.tv, st.tu === "min" ? MAXMIN : MAXSEC); warn(""); refresh();
+      }));
+      $$("[data-fps]", root).forEach((b) => b.addEventListener("click", () => { st.fps = Number(b.dataset.fps); warn(""); refresh(); }));
+    }
+    const comp = {
+      root, st, warn,
+      sync(skip) {
+        $$("[data-res]", root).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.res === `${st.w},${st.h}`)));
+        $$("[data-bits]", root).forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.bits) === st.bits)));
+        for (const key of ["w", "h", "fps", "tv"]) { const el = q(key); if (el && el !== skip && document.activeElement !== el) el.value = st[key]; }
+        if (movie) {
+          $$("[data-tu]", root).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tu === st.tu)));
+          $$("[data-fps]", root).forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.fps) === st.fps)));
+          q("tmax").textContent = st.tu === "min" ? `${MAXMIN} 分` : `${MAXSEC} 秒`;
+        }
+      },
+    };
+    comps.push(comp);
+    return comp;
+  }
+
+  const main = mk();                       // ②③で共有する設定
+  const cmpA = mk(), cmpB = mk({ fps: 60 });
+  const cA = settings($("#set-A"), cmpA, true), cB = settings($("#set-B"), cmpB, true);
+  const cFrame = settings($("#set-frame"), main, false), cMovie = settings($("#set-movie"), main, true);
+
+  function refresh(skip) { comps.forEach((c) => c.sync(skip)); redraw(); }
+
+  // =====================================================================
+  //  かくしモード
+  // =====================================================================
+  let hide = false;
+  function applyHide() {
+    $("#page").classList.toggle("hide-num", hide);
+    $$("[data-hide]").forEach((el) => {
+      if (el.dataset.norm === undefined) el.dataset.norm = el.innerHTML;
+      el.innerHTML = hide ? el.dataset.hide : el.dataset.norm;
+    });
+    for (const id of ["frame", "movie", "compare"]) {
+      $(`#panel-${id} [data-cover]`).hidden = !hide;
+      $(`#panel-${id} [data-body]`).hidden = hide;
+    }
+    buildN(); buildStrip();
+    renderFlip();
+    redraw();
+  }
+  $("#hide-num").addEventListener("change", (e) => { hide = e.target.checked; applyHide(); });
+
+  // =====================================================================
+  //  パラパラまんが
+  // =====================================================================
+  const fl = { anim: "ball", n: 5, fps: 5, i: 0, playing: !window.matchMedia("(prefers-reduced-motion: reduce)").matches, last: null, acc: 0, raf: 0 };
+  const NS = [[3, "少なめ"], [5, "ふつう"], [8, "多め"], [12, "とても多め"]];
+  const FPS_CHIPS = [1, 2, 5, 10, 24, 30, 60];
+  const SW = 320, SH = 240;
+
+  function drawScene(g, anim, i, n) {
+    g.save();
+    g.fillStyle = "#FBFDF9"; g.fillRect(0, 0, SW, SH);
+    const ground = 196;
+    g.fillStyle = C["leaf-soft"]; g.fillRect(0, ground, SW, SH - ground);
+    g.fillStyle = C["leaf-line"]; g.fillRect(0, ground, SW, 3);
+    if (anim === "ball") {
+      const p = n === 1 ? 0 : i / (n - 1);
+      const x = 40 + (SW - 80) * p;
+      const q = ((2 * i) / n) % 1, hgt = 4 * q * (1 - q) * 120;
+      const r = 20, y = ground - r - hgt;
+      g.fillStyle = "rgba(31,42,36,0.15)";
+      g.beginPath(); g.ellipse(x, ground + 14, r * (1 - hgt / 260), 5, 0, 0, 7); g.fill();
+      g.fillStyle = C.shu; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+      g.fillStyle = "rgba(255,255,255,0.45)"; g.beginPath(); g.arc(x - 7, y - 7, 6, 0, 7); g.fill();
+    } else if (anim === "pendulum") {
+      const px = SW / 2, py = 30, L = 150, a = 0.7 * Math.cos((2 * Math.PI * i) / n);
+      const bx = px + L * Math.sin(a), by = py + L * Math.cos(a);
+      g.strokeStyle = C.ink; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(px - 40, py); g.lineTo(px + 40, py); g.stroke();
+      g.lineWidth = 2; g.beginPath(); g.moveTo(px, py); g.lineTo(bx, by); g.stroke();
+      g.fillStyle = C.leaf; g.beginPath(); g.arc(bx, by, 18, 0, 7); g.fill();
+      g.fillStyle = C.ink; g.beginPath(); g.arc(px, py, 4, 0, 7); g.fill();
+    } else {
+      const p = n === 1 ? 0 : i / (n - 1), x = -10 + (SW - 70) * p, y = ground - 34;
+      g.fillStyle = C.pen; g.beginPath(); g.arc(270, 46, 22, 0, 7); g.fill();
+      g.fillStyle = C.sky; g.fillRect(x, y, 70, 22);
+      g.fillStyle = "#4C7FAE"; g.fillRect(x + 16, y - 16, 36, 17);
+      g.fillStyle = "#FBFDF9"; g.fillRect(x + 21, y - 12, 12, 11); g.fillRect(x + 36, y - 12, 12, 11);
+      for (const wx of [x + 17, x + 54]) {
+        g.fillStyle = C.ink; g.beginPath(); g.arc(wx, y + 24, 11, 0, 7); g.fill();
+        const a = (i * 1.1) % (2 * Math.PI);
+        g.strokeStyle = "#FBFDF9"; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(wx, y + 24); g.lineTo(wx + 9 * Math.cos(a), y + 24 + 9 * Math.sin(a)); g.stroke();
+      }
+    }
+    g.restore();
+  }
+  function setupMain() {
+    const c = $("#flip-canvas"), dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth || c.parentElement.clientWidth || 300;
+    c.style.height = (w * SH / SW) + "px";
+    c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(w * SH / SW * dpr));
+  }
+  function drawMain() {
+    const c = $("#flip-canvas"), g = c.getContext("2d");
+    g.setTransform(c.width / SW, 0, 0, c.height / SH, 0, 0);
+    drawScene(g, fl.anim, fl.i, fl.n);
+  }
+  function buildN() {
+    $("#f-n").innerHTML = NS.map(([n, lab]) => `<button type="button" data-n="${n}" aria-pressed="${n === fl.n}">${hide ? lab : `${n} コマ`}</button>`).join("");
+    $$("#f-n button").forEach((b) => b.addEventListener("click", () => { fl.n = Number(b.dataset.n); fl.i = 0; buildStrip(); renderFlip(); }));
+  }
+  function buildStrip() {
+    const box = $("#f-strip");
+    box.innerHTML = "";
+    for (let k = 0; k < fl.n; k++) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "thumb"; b.dataset.i = k;
+      b.setAttribute("aria-label", hide ? "絵" : `${k + 1}番目の絵`);
+      const cv = document.createElement("canvas"); cv.width = 160; cv.height = 120;
+      const g = cv.getContext("2d"); g.setTransform(160 / SW, 0, 0, 120 / SH, 0, 0);
+      drawScene(g, fl.anim, k, fl.n);
+      const lab = document.createElement("span"); lab.className = "num-only"; lab.textContent = `${k + 1}`;
+      b.append(cv, lab);
+      b.addEventListener("click", () => { fl.playing = false; fl.i = k; renderFlip(); });
+      box.appendChild(b);
+    }
+  }
+  function renderFlip() {
+    if ($("#panel-flip").hidden) return;
+    $("#f-fps").value = fl.fps;
+    const fv = $("#f-fps-val"); if (fv) fv.textContent = fl.fps;
+    $("#f-fps").setAttribute("aria-valuetext", hide ? "めくる速さ" : `${fl.fps} fps`);
+    $$("#f-anim button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.anim === fl.anim)));
+    $$("#f-n button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.n) === fl.n)));
+    $$("#f-fps-chips .chip").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.f) === fl.fps)));
+    $$("#f-strip .thumb").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.i) === fl.i)));
+    $("#f-play").textContent = fl.playing ? "とめる" : "再生";
+    const sec = fl.n / fl.fps, one = 1 / fl.fps;
+    $("#flip-status").innerHTML =
+      `1秒に <span class="eq">${fl.fps} フレーム</span>（フレームレート ＝ <span class="eq">${fl.fps} fps</span>）．1フレームは ${one.toFixed(3).replace(/\.?0+$/, "")} 秒ずつ．` +
+      `<br>いま ${fl.i + 1} / ${fl.n} フレーム目．ひとまわり（${fl.n} フレーム）は ${(+sec.toFixed(3))} 秒．`;
+    drawMain();
+    if (fl.playing) startLoop();
+  }
+  function loop(ts) {
+    fl.raf = 0;
+    if (!fl.playing || $("#panel-flip").hidden) return;
+    if (fl.last === null) fl.last = ts;
+    fl.acc += ts - fl.last; fl.last = ts;
+    const step = 1000 / fl.fps;
+    if (fl.acc >= step) {
+      const k = Math.floor(fl.acc / step); fl.acc -= k * step; fl.i = (fl.i + k) % fl.n;
+      $$("#f-strip .thumb").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.i) === fl.i)));
+      if (!hide) $("#flip-status").innerHTML = $("#flip-status").innerHTML.replace(/いま \d+ \/ \d+ フレーム目/, `いま ${fl.i + 1} / ${fl.n} フレーム目`);
+      drawMain();
+    }
+    fl.raf = requestAnimationFrame(loop);
+  }
+  function startLoop() { if (!fl.raf) { fl.last = null; fl.acc = 0; fl.raf = requestAnimationFrame(loop); } }
+  function stepFrame(d) { fl.playing = false; fl.i = (fl.i + d + fl.n) % fl.n; renderFlip(); }
+  FPS_CHIPS.forEach((f) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.dataset.f = f; b.textContent = `${f} fps`;
+    b.addEventListener("click", () => { fl.fps = f; renderFlip(); });
+    $("#f-fps-chips").appendChild(b);
+  });
+  $("#f-fps").addEventListener("input", (e) => { fl.fps = Number(e.target.value); renderFlip(); });
+  $$("#f-anim button").forEach((b) => b.addEventListener("click", () => { fl.anim = b.dataset.anim; buildStrip(); renderFlip(); }));
+  $("#f-play").addEventListener("click", () => { fl.playing = !fl.playing; renderFlip(); });
+  $("#f-prev").addEventListener("click", () => stepFrame(-1));
+  $("#f-next").addEventListener("click", () => stepFrame(1));
+  $("#flip-canvas").addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") { e.preventDefault(); stepFrame(-1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); stepFrame(1); }
+    else if (e.key === " ") { e.preventDefault(); fl.playing = !fl.playing; renderFlip(); }
+  });
+  $("#flip-canvas").addEventListener("click", () => stepFrame(1));
+
+  // =====================================================================
+  //  ② 1フレームのデータ量
+  // =====================================================================
+  function renderFrame() {
+    if ($("#panel-frame").hidden || hide) return;
+    const { w, h, bits } = main, B = frameBits(main);
+    const dBytes = decimal(B, 3), dKB = decimal(B, 13), dMB = decimal(B, 23);
+    $("#fr-steps").innerHTML = [
+      row("ビット数＝横×縦×ビット", `${w} × ${h} × ${bits} ＝ ${B} ビット`),
+      row("÷8 → バイト（B）", `${B} ÷ 8 ${eqText(dBytes, "B")}`),
+      row("÷1024 → KB", `${exactDec(B, 3)} ÷ 1024 ${eqText(dKB, "KB")}`),
+      row("÷1024 → MB", `${exactDec(B, 13)} ÷ 1024 ${eqText(dMB, "MB")}`),
+    ].join("");
+    const per = bits / 8;
+    const textbook = bits === 1 ? `${w} × ${h} × 1 ÷ 8 ÷ 1024 ÷ 1024` : `${per} × ${w} × ${h} ÷ 1024 ÷ 1024`;
+    $("#fr-forms").innerHTML = row("教科書の形（MB）", `${textbook} ${eqText(dMB, "MB")}`);
+    $("#fr-mode").innerHTML = `<span class="eq">${MODES.find((m) => m.bits === bits).name}</span><br>${MODES.find((m) => m.bits === bits).note}`;
+    drawSizes();
+  }
+  function drawSizes() {
+    const c = $("#fr-sizes"), dpr = window.devicePixelRatio || 1;
+    const W = c.clientWidth || 300, H = Math.round(Math.min(260, W * 0.45));
+    c.style.height = H + "px"; c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+    const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const maxW = Math.max(3840, main.w), maxH = Math.max(2160, main.h);
+    const sc = Math.min((W - 12) / maxW, (H - 12) / maxH), ox = 6, oy = 6;
+    const sel = [...RES, [main.w, main.h]];
+    sel.forEach(([w, h], idx) => {
+      const isSel = w === main.w && h === main.h, custom = idx === RES.length;
+      if (custom && RES.some(([a, b]) => a === w && b === h)) return;
+      const rw = Math.max(w * sc, isSel ? 8 : 1), rh = Math.max(h * sc, isSel ? 8 : 1);
+      g.beginPath(); g.rect(ox, oy, rw, rh);
+      if (isSel) { g.fillStyle = C.pen; g.globalAlpha = 0.5; g.fill(); g.globalAlpha = 1; }
+      g.lineWidth = isSel ? 2.5 : 1.2; g.strokeStyle = isSel ? C.ink : C.leaf; g.setLineDash(custom ? [5, 3] : []); g.stroke(); g.setLineDash([]);
+      if (!custom && w * sc >= 70) {
+        g.fillStyle = isSel ? C.ink : C["ink-soft"]; g.font = FONT(11, isSel ? "700" : ""); g.textBaseline = "bottom"; g.textAlign = "right";
+        g.fillText(`${w}×${h}`, ox + rw - 4, oy + rh - 2);
+      }
+    });
+    if (main.w * sc < 70) { g.fillStyle = C.ink; g.font = FONT(12, "700"); g.textAlign = "left"; g.textBaseline = "top"; g.fillText(`選択中：${main.w}×${main.h}`, ox + Math.max(main.w * sc, 8) + 8, oy + 2); }
+  }
+
+  // =====================================================================
+  //  ③ 動画のデータ量（ ② と共通の計算）
+  // =====================================================================
+  function movieNumbers(s) {
+    const fb = frameBits(s), sec = secOf(s), tb = totalBits(s);
+    return { fb, sec, tb, frames: s.fps * sec, dFrameMB: decimal(fb, 23), dSecMB: decimal(fb * s.fps, 23), dMB: decimal(tb, 23), dGB: decimal(tb, 33) };
+  }
+  function renderMovie() {
+    if ($("#panel-movie").hidden || hide) return;
+    const s = main, m = movieNumbers(s), tb = m.tb;
+    $$("[data-mp]").forEach((b) => { const [w, h, bt, f, tv, tu] = b.dataset.mp.split(","); b.setAttribute("aria-pressed", String(+w === s.w && +h === s.h && +bt === s.bits && +f === s.fps && +tv === s.tv && tu === (s.tu === "min" ? "min" : "s"))); });
+    $("#mv-facts").innerHTML = `
+      <div><dt>1フレームのデータ量</dt><dd>${approx(m.dFrameMB)} MB</dd></div>
+      <div><dt>1秒あたり（× ${s.fps} fps）</dt><dd>${approx(m.dSecMB)} MB</dd></div>
+      <div><dt>動画のデータ量（MB）</dt><dd>${approx(m.dMB)} MB</dd></div>
+      <div><dt>動画のデータ量（GB）</dt><dd>${approx(m.dGB)} GB</dd></div>`;
+    $("#mv-steps").innerHTML = [
+      row("1フレームのビット数", `${s.w} × ${s.h} × ${s.bits} ＝ ${m.fb} ビット`),
+      row("フレーム数", `${s.fps} fps × ${m.sec} 秒 ＝ ${m.frames} フレーム`),
+      row("全体のビット数", `${m.fb} ビット × ${s.fps} fps × ${m.sec} 秒 ＝ ${tb} ビット`),
+      row("÷8 → バイト（B）", `${tb} ÷ 8 ${eqText(decimal(tb, 3), "B")}`),
+      row("÷1024 → KB", `${exactDec(tb, 3)} ÷ 1024 ${eqText(decimal(tb, 13), "KB")}`),
+      row("÷1024 → MB", `${exactDec(tb, 13)} ÷ 1024 ${eqText(m.dMB, "MB")}`),
+      row("÷1024 → GB", `${exactDec(tb, 23)} ÷ 1024 ${eqText(m.dGB, "GB", true)}`),
+    ].join("");
+    const fm = m.dFrameMB;
+    $("#mv-forms").innerHTML = [
+      row("教科書の形（MB → GB）", `1フレーム ${fm.text} MB × ${s.fps} fps × ${m.sec} 秒 ${eqText(m.dMB, "MB")}<br>${exactDec(tb, 23)} MB ÷ 1024 ${eqText(m.dGB, "GB", true)}${fm.exact ? "" : `<br><small>（1フレームの MB は小数第2位に丸めて書いています．計算は丸めずに行っています）</small>`}`),
+    ].join("");
+  }
+  $$("[data-mp]").forEach((b) => b.addEventListener("click", () => {
+    const [w, h, bt, f, tv, tu] = b.dataset.mp.split(",");
+    Object.assign(main, { w: +w, h: +h, bits: +bt, fps: +f, tv: +tv, tu: tu === "min" ? "min" : "s" });
+    cMovie.warn(""); refresh();
+  }));
+
+  // =====================================================================
+  //  ④ 比べる
+  // =====================================================================
+  const frac = (num, den) => { const g = gcd(num, den); return [num / g, den / g]; };
+  const fracText = (num, den) => (den === 1 ? `${num}` : `${num}/${den}`);
+  function renderCompare() {
+    if ($("#panel-compare").hidden || hide) return;
+    for (const [key, s] of [["A", cmpA], ["B", cmpB]]) {
+      const m = movieNumbers(s);
+      $(`#cmp-${key}`).innerHTML = `
+        <div><dt>1フレーム</dt><dd>${approx(m.dFrameMB)} MB</dd></div>
+        <div><dt>1秒あたり</dt><dd>${approx(m.dSecMB)} MB</dd></div>
+        <div><dt>動画（MB）</dt><dd>${approx(m.dMB)} MB</dd></div>
+        <div><dt>動画（GB）</dt><dd>${approx(m.dGB)} GB</dd></div>`;
+    }
+    const tA = totalBits(cmpA), tB = totalBits(cmpB);
+    const [n, d] = frac(tB, tA), [n2, d2] = frac(tA, tB);
+    let txt;
+    if (n === d) txt = "B のデータ量は <strong>A と同じ</strong>です．";
+    else {
+      txt = `B のデータ量は A の <strong>${fracText(n, d)}倍</strong>${d === 1 ? "" : `（≒ ${(tB / tA).toFixed(2)}倍）`}です．`;
+      txt += `（逆に，A のデータ量は B の ${fracText(n2, d2)}倍です．）`;
+    }
+    $("#cmp-ratio").innerHTML = txt;
+    const fs = [
+      ["画素数（横×縦）", cmpA.w * cmpA.h, cmpB.w * cmpB.h],
+      ["1画素のビット数", cmpA.bits, cmpB.bits],
+      ["フレームレート", cmpA.fps, cmpB.fps],
+      ["時間（秒）", secOf(cmpA), secOf(cmpB)],
+    ];
+    const parts = fs.map(([lab, a, b]) => { const [nn, dd] = frac(b, a); return [lab, a, b, nn, dd]; });
+    $("#cmp-break").innerHTML = parts.map(([lab, a, b, nn, dd]) => row(lab, `${a} → ${b}　<small>B は A の ${fracText(nn, dd)}倍</small>`)).join("") +
+      row("全体（4つの倍率の積）", `${parts.map((p) => fracText(p[3], p[4])).join(" × ")} ＝ ${fracText(n, d)}倍`);
+  }
+  $$("[data-cp]").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.cp;
+    if (k === "same") Object.assign(cmpB, cmpA);
+    else if (k === "fps2") { cmpB.fps = Math.min(MAXFPS, cmpA.fps * 2); }
+    else if (k === "res2") { cmpB.w = Math.min(MAXP, cmpA.w * 2); cmpB.h = Math.min(MAXP, cmpA.h * 2); }
+    else if (k === "time2") { cmpB.tu = cmpA.tu; cmpB.tv = Math.min(cmpA.tu === "min" ? MAXMIN : MAXSEC, cmpA.tv * 2); }
+    else if (k === "gray") { cmpB.bits = 8; }
+    else if (k === "k4") Object.assign(cmpB, { w: 3840, h: 2160, bits: 24, fps: 60, tv: 10, tu: "min" });
+    cB.warn(""); refresh();
+  }));
+
+  // =====================================================================
+  //  タブと URL
+  // =====================================================================
+  const tabs = $$(".tab");
+  function selectTab(tab, focus = true, hash) {
+    tabs.forEach((t) => {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on)); t.tabIndex = on ? 0 : -1;
+      $("#" + t.getAttribute("aria-controls")).hidden = !on;
+    });
+    if (focus) tab.focus();
+    history.replaceState(null, "", location.pathname + location.search + "#" + (hash || tab.dataset.hash));
+    comps.forEach((c) => c.sync());
+    redraw();
+  }
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => selectTab(t, false));
+    t.addEventListener("keydown", (e) => {
+      let n = null;
+      if (e.key === "ArrowRight") n = tabs[(i + 1) % tabs.length];
+      else if (e.key === "ArrowLeft") n = tabs[(i + tabs.length - 1) % tabs.length];
+      else if (e.key === "Home") n = tabs[0];
+      else if (e.key === "End") n = tabs[tabs.length - 1];
+      if (n) { e.preventDefault(); selectTab(n); }
+    });
+  });
+  function redraw() {
+    if (!$("#panel-flip").hidden) { setupMain(); renderFlip(); }
+    renderFrame(); renderMovie(); renderCompare();
+  }
+  let rt = null;
+  window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(redraw, 120); });
+
+  // ?w=1024&h=768&bits=24&fps=30&t=180&u=min#movie，?hide=1#flip
+  const params = new URLSearchParams(location.search);
+  const intParam = (k, lo, hi) => { const s = params.get(k); return s !== null && /^[0-9]+$/.test(s) && +s >= lo && +s <= hi ? +s : null; };
+  const pw = intParam("w", 1, MAXP), ph = intParam("h", 1, MAXP), pf = intParam("fps", 1, MAXFPS);
+  if (pw) main.w = pw;
+  if (ph) main.h = ph;
+  if ([24, 8, 1].includes(Number(params.get("bits")))) main.bits = Number(params.get("bits"));
+  if (pf) main.fps = pf;
+  const pu = params.get("u") === "min" ? "min" : "s", pt = intParam("t", 1, MAXSEC);
+  if (pt) { if (pu === "min" && pt % 60 === 0) { main.tu = "min"; main.tv = pt / 60; } else { main.tu = "s"; main.tv = pt; } }
+  Object.assign(cmpA, main); Object.assign(cmpB, main, { fps: Math.min(MAXFPS, main.fps * 2) });
+  if (params.get("hide") === "1") { hide = true; $("#hide-num").checked = true; }
+
+  buildN(); buildStrip();
+  const tabOf = (id) => tabs.find((t) => t.dataset.hash === id);
+  function applyHash() {
+    const hash = location.hash.slice(1), t = tabOf(hash);
+    selectTab(t || tabs[0], false, t ? hash : "flip");
+  }
+  applyHide();
+  applyHash();
+  window.addEventListener("hashchange", applyHash);
+})();
+</script>
+</body>
+</html>
