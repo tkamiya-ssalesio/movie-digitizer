@@ -139,6 +139,8 @@
   .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: 0.5rem; }
   .thumb { appearance: none; font: inherit; border: 2px solid var(--leaf-line); border-radius: 10px; background: var(--sheet); padding: 0.2rem; cursor: pointer; display: grid; gap: 0.1rem; text-align: center; font-size: 0.72rem; color: var(--ink-soft); }
   .thumb canvas { border-radius: 6px; height: auto; aspect-ratio: 4 / 3; }
+  .strip.dense { grid-template-columns: repeat(auto-fill, minmax(2.9rem, 1fr)); gap: 0.3rem; }
+  .strip.dense .thumb { padding: 0.1rem; border-width: 1.5px; border-radius: 6px; }
   .thumb[aria-pressed="true"] { border-color: var(--ink); background: var(--pen-soft); color: var(--ink); font-weight: 700; }
 
   .hide-cover { margin: 0; padding: 1.2rem 1.4rem; border-radius: 12px; background: var(--pen-soft); }
@@ -178,12 +180,12 @@
   <main>
     <!-- ===== パラパラまんが ===== -->
     <section class="panel" id="panel-flip" role="tabpanel" aria-labelledby="tab-flip">
-      <p class="panel-intro" id="flip-intro" data-hide="絵が，つぎつぎに切り替わります．めくる速さを変えて，動きの見え方がどう変わるか，観察しよう．">動画は，静止画を連続的に表示したものです．動画を構成している1枚1枚の画像を<strong>フレーム</strong>（パラパラまんがの1コマ），1秒あたりに再生するフレーム数を<strong>フレームレート</strong>（単位は <strong>fps</strong>）といいます．フレームレートを変えて，動きの見え方を確かめよう．</p>
+      <p class="panel-intro" id="flip-intro" data-hide="絵が，つぎつぎに切り替わります．めくる速さを変えて，動きの見え方がどう変わるか，観察しよう．">動画は，静止画を連続的に表示したものです．動画を構成している1枚1枚の画像を<strong>フレーム</strong>（パラパラまんがの1コマ），1秒あたりに再生するフレーム数を<strong>フレームレート</strong>（単位は <strong>fps</strong>）といいます．動きの速さは変わりません．同じ動きを1秒に何枚で写すかを変えて，見え方を確かめよう．</p>
 
       <div class="flip-layout">
         <div class="field">
           <span class="field-label" data-hide="いまの絵（押すか，矢印キーでも切り替えられます）">いまのフレーム（押すか，矢印キーでも切り替えられます）</span>
-          <div class="chart"><canvas id="flip-canvas" tabindex="0" aria-label="パラパラまんがの絵．左右の矢印キーで1コマずつ送ります"></canvas></div>
+          <div class="chart"><canvas id="flip-canvas" tabindex="0" aria-label="パラパラまんがの絵．左右の矢印キーで1フレームずつ送ります"></canvas></div>
           <p class="formula num-only" id="flip-status" aria-live="off"></p>
         </div>
         <div class="side">
@@ -196,28 +198,26 @@
             </div>
           </div>
           <div class="field">
-            <span class="field-label" data-hide="絵の枚数">コマ数（全部で何フレームか）</span>
-            <div class="seg" role="group" aria-label="絵の枚数" id="f-n"></div>
-          </div>
-          <div class="field">
-            <span class="field-label" id="f-fps-label" data-hide="めくる速さ">フレームレート（1秒に再生するフレーム数）：<span class="value" id="f-fps-val">5</span> fps</span>
+            <span class="field-label" id="f-fps-label" data-hide="めくる速さ">フレームレート（同じ動きを，1秒に何枚で写すか）：<span class="value" id="f-fps-val">5</span> fps</span>
             <input type="range" id="f-fps" min="1" max="60" step="1" value="5" aria-labelledby="f-fps-label">
             <div class="presets num-only" id="f-fps-chips"><span class="small-label">例：</span></div>
+            <p class="note num-only">多くの画面は更新が1秒に60回なので，60 fps が上限です．</p>
           </div>
           <div class="btnrow">
             <button type="button" class="btn btn-secondary" id="f-prev">前へ</button>
             <button type="button" class="btn btn-primary" id="f-play">とめる</button>
             <button type="button" class="btn btn-secondary" id="f-next">次へ</button>
           </div>
-          <p class="note" data-hide="とめるとコマ送りができます．下の絵を押すと，その絵で止まります．">止めると，コマ送り（前へ／次へ）ができます．下のフレームを押すと，そのフレームで止まります．</p>
+          <p class="note" data-hide="とめるとコマ送りができます．下の絵を押すと，その絵で止まります．">止めると，コマ送り（前へ／次へ）ができます．下のフレームを押すと，そのフレームで止まります．前へ／次へは1フレームぶん（1/fps 秒）ずつ進みます．</p>
         </div>
       </div>
 
       <div class="field">
-        <span class="field-label" data-hide="すべての絵（めくる順）">すべてのフレーム（めくる順）</span>
+        <span class="field-label" data-hide="ひとまわりの絵（めくる順）">1秒間のフレーム（めくる順）</span>
+        <p class="note num-only" id="f-strip-count"></p>
         <div class="strip" id="f-strip"></div>
       </div>
-      <p class="note num-only">動画は，このように 1枚1枚のフレーム（静止画）を，1秒間に何枚も再生してつくります．テレビやビデオでは約30fps あるいは約60fps，フィルム映画では24fps のものが多いです．</p>
+      <p class="note num-only">動画は，このように 1枚1枚のフレーム（静止画）を，1秒間に何枚も再生してつくります．テレビやビデオでは約30 fps あるいは約60 fps，フィルム映画では24 fps のものが多いです．</p>
     </section>
 
     <!-- ===== 1フレームのデータ量 ===== -->
@@ -440,7 +440,8 @@
       $(`#panel-${id} [data-cover]`).hidden = !hide;
       $(`#panel-${id} [data-body]`).hidden = hide;
     }
-    buildN(); buildStrip();
+    $("#flip-canvas").setAttribute("aria-label", hide ? "パラパラまんがの絵．左右の矢印キーで送ります" : "パラパラまんがの絵．左右の矢印キーで1フレームずつ送ります");
+    buildStrip();
     renderFlip();
     redraw();
   }
@@ -449,49 +450,54 @@
   // =====================================================================
   //  パラパラまんが
   // =====================================================================
-  const fl = { anim: "ball", n: 5, fps: 5, i: 0, playing: !window.matchMedia("(prefers-reduced-motion: reduce)").matches, last: null, acc: 0, raf: 0 };
-  const NS = [[3, "少なめ"], [5, "ふつう"], [8, "多め"], [12, "とても多め"]];
+  const fl = { anim: "ball", fps: 5, t: 0, idx: 0, playing: !window.matchMedia("(prefers-reduced-motion: reduce)").matches, t0: 0, raf: 0 };
   const FPS_CHIPS = [1, 2, 5, 10, 24, 30, 60];
   const SW = 320, SH = 240;
+  const SUBJ = { ball: ["ボールは1秒で1回跳ぶ", "その1回"], pendulum: ["ふりこは1秒で1往復する", "その動き"], car: ["車は1秒で1回，画面を横切る", "その動き"] };
+  // 割り切れない秒数には「約」を付ける
+  const secText = (x) => { const r = +x.toFixed(3); return (Math.abs(r - x) > 1e-9 ? "約 " : "") + r + " 秒"; };
 
-  function drawScene(g, anim, i, n) {
+  // ph：1秒を 0〜1 にした位相．動きは時間だけで決まり，fps には依存しない
+  function drawScene(g, anim, ph) {
     g.save();
     g.fillStyle = "#FBFDF9"; g.fillRect(0, 0, SW, SH);
-    const ground = 196;
+    const ground = 196, TAU = 2 * Math.PI;
     g.fillStyle = C["leaf-soft"]; g.fillRect(0, ground, SW, SH - ground);
     g.fillStyle = C["leaf-line"]; g.fillRect(0, ground, SW, 3);
     if (anim === "ball") {
-      const p = n === 1 ? 0 : i / (n - 1);
-      const x = 40 + (SW - 80) * p;
-      const q = ((2 * i) / n) % 1, hgt = 4 * q * (1 - q) * 120;
+      const x = 40 + (SW - 80) * ph;
+      const hgt = 4 * ph * (1 - ph) * 120;
       const r = 20, y = ground - r - hgt;
       g.fillStyle = "rgba(31,42,36,0.15)";
       g.beginPath(); g.ellipse(x, ground + 14, r * (1 - hgt / 260), 5, 0, 0, 7); g.fill();
       g.fillStyle = C.shu; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
       g.fillStyle = "rgba(255,255,255,0.45)"; g.beginPath(); g.arc(x - 7, y - 7, 6, 0, 7); g.fill();
     } else if (anim === "pendulum") {
-      const px = SW / 2, py = 30, L = 150, a = 0.7 * Math.cos((2 * Math.PI * i) / n);
+      const px = SW / 2, py = 30, L = 150, a = 0.7 * Math.cos(TAU * ph);
       const bx = px + L * Math.sin(a), by = py + L * Math.cos(a);
       g.strokeStyle = C.ink; g.lineWidth = 3;
       g.beginPath(); g.moveTo(px - 40, py); g.lineTo(px + 40, py); g.stroke();
       g.lineWidth = 2; g.beginPath(); g.moveTo(px, py); g.lineTo(bx, by); g.stroke();
       g.fillStyle = C.leaf; g.beginPath(); g.arc(bx, by, 18, 0, 7); g.fill();
+      g.strokeStyle = "#FBFDF9"; g.lineWidth = 3; g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + 12 * Math.cos(TAU * ph), by + 12 * Math.sin(TAU * ph)); g.stroke();
       g.fillStyle = C.ink; g.beginPath(); g.arc(px, py, 4, 0, 7); g.fill();
     } else {
-      const p = n === 1 ? 0 : i / (n - 1), x = -10 + (SW - 70) * p, y = ground - 34;
+      const x = -10 + (SW - 70) * ph, y = ground - 34;
       g.fillStyle = C.pen; g.beginPath(); g.arc(270, 46, 22, 0, 7); g.fill();
       g.fillStyle = C.sky; g.fillRect(x, y, 70, 22);
       g.fillStyle = "#4C7FAE"; g.fillRect(x + 16, y - 16, 36, 17);
       g.fillStyle = "#FBFDF9"; g.fillRect(x + 21, y - 12, 12, 11); g.fillRect(x + 36, y - 12, 12, 11);
       for (const wx of [x + 17, x + 54]) {
         g.fillStyle = C.ink; g.beginPath(); g.arc(wx, y + 24, 11, 0, 7); g.fill();
-        const a = (i * 1.1) % (2 * Math.PI);
+        const a = ph * TAU * 3;
         g.strokeStyle = "#FBFDF9"; g.lineWidth = 2;
         g.beginPath(); g.moveTo(wx, y + 24); g.lineTo(wx + 9 * Math.cos(a), y + 24 + 9 * Math.sin(a)); g.stroke();
       }
     }
     g.restore();
   }
+  // 時刻 t（秒，0〜1）を 1/fps ごとに切り捨てる（サンプルアンドホールド）
+  const frameOf = (t, fps) => Math.min(fps - 1, Math.floor(t * fps + 1e-9));
   function setupMain() {
     const c = $("#flip-canvas"), dpr = window.devicePixelRatio || 1;
     const w = c.clientWidth || c.parentElement.clientWidth || 300;
@@ -501,27 +507,30 @@
   function drawMain() {
     const c = $("#flip-canvas"), g = c.getContext("2d");
     g.setTransform(c.width / SW, 0, 0, c.height / SH, 0, 0);
-    drawScene(g, fl.anim, fl.i, fl.n);
-  }
-  function buildN() {
-    $("#f-n").innerHTML = NS.map(([n, lab]) => `<button type="button" data-n="${n}" aria-pressed="${n === fl.n}">${hide ? lab : `${n} コマ`}</button>`).join("");
-    $$("#f-n button").forEach((b) => b.addEventListener("click", () => { fl.n = Number(b.dataset.n); fl.i = 0; buildStrip(); renderFlip(); }));
+    drawScene(g, fl.anim, fl.idx / fl.fps);
   }
   function buildStrip() {
     const box = $("#f-strip");
     box.innerHTML = "";
-    for (let k = 0; k < fl.n; k++) {
+    const many = fl.fps > 12;
+    box.classList.toggle("dense", many);
+    const tw = many ? 80 : 160, th = many ? 60 : 120;
+    for (let k = 0; k < fl.fps; k++) {
       const b = document.createElement("button");
       b.type = "button"; b.className = "thumb"; b.dataset.i = k;
-      b.setAttribute("aria-label", hide ? "絵" : `${k + 1}番目の絵`);
-      const cv = document.createElement("canvas"); cv.width = 160; cv.height = 120;
-      const g = cv.getContext("2d"); g.setTransform(160 / SW, 0, 0, 120 / SH, 0, 0);
-      drawScene(g, fl.anim, k, fl.n);
-      const lab = document.createElement("span"); lab.className = "num-only"; lab.textContent = `${k + 1}`;
-      b.append(cv, lab);
-      b.addEventListener("click", () => { fl.playing = false; fl.i = k; renderFlip(); });
+      b.setAttribute("aria-label", hide ? "絵" : `${k + 1}枚目の絵（${secText(k / fl.fps)}）`);
+      const cv = document.createElement("canvas"); cv.width = tw; cv.height = th;
+      const g = cv.getContext("2d"); g.setTransform(tw / SW, 0, 0, th / SH, 0, 0);
+      drawScene(g, fl.anim, k / fl.fps);
+      b.appendChild(cv);
+      if (!many) { const lab = document.createElement("span"); lab.className = "num-only"; lab.textContent = `${k + 1}`; b.appendChild(lab); }
+      b.addEventListener("click", () => { fl.playing = false; fl.idx = k; fl.t = k / fl.fps; renderFlip(); });
       box.appendChild(b);
     }
+    $("#f-strip-count").textContent = `1秒に ${fl.fps} 枚${many ? "（小さく並べています）" : ""}`;
+  }
+  function markCurrent() {
+    $$("#f-strip .thumb").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.i) === fl.idx)));
   }
   function renderFlip() {
     if ($("#panel-flip").hidden) return;
@@ -529,40 +538,40 @@
     const fv = $("#f-fps-val"); if (fv) fv.textContent = fl.fps;
     $("#f-fps").setAttribute("aria-valuetext", hide ? "めくる速さ" : `${fl.fps} fps`);
     $$("#f-anim button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.anim === fl.anim)));
-    $$("#f-n button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.n) === fl.n)));
     $$("#f-fps-chips .chip").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.f) === fl.fps)));
-    $$("#f-strip .thumb").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.i) === fl.i)));
+    markCurrent();
     $("#f-play").textContent = fl.playing ? "とめる" : "再生";
-    const sec = fl.n / fl.fps, one = 1 / fl.fps;
+    const one = 1 / fl.fps;
     $("#flip-status").innerHTML =
-      `1秒に <span class="eq">${fl.fps} フレーム</span>（フレームレート ＝ <span class="eq">${fl.fps} fps</span>）．1フレームは ${one.toFixed(3).replace(/\.?0+$/, "")} 秒ずつ．` +
-      `<br>いま ${fl.i + 1} / ${fl.n} フレーム目．ひとまわり（${fl.n} フレーム）は ${(+sec.toFixed(3))} 秒．`;
+      `1秒に <span class="eq">${fl.fps} フレーム</span>（フレームレート ＝ <span class="eq">${fl.fps} fps</span>）．1フレームは ${secText(one)}ずつ．` +
+      `<br>${SUBJ[fl.anim][0]}．${fl.fps} fps では，${SUBJ[fl.anim][1]}を ${fl.fps} 枚で写している．`;
     drawMain();
     if (fl.playing) startLoop();
   }
   function loop(ts) {
     fl.raf = 0;
     if (!fl.playing || $("#panel-flip").hidden) return;
-    if (fl.last === null) fl.last = ts;
-    fl.acc += ts - fl.last; fl.last = ts;
-    const step = 1000 / fl.fps;
-    if (fl.acc >= step) {
-      const k = Math.floor(fl.acc / step); fl.acc -= k * step; fl.i = (fl.i + k) % fl.n;
-      $$("#f-strip .thumb").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.i) === fl.i)));
-      if (!hide) $("#flip-status").innerHTML = $("#flip-status").innerHTML.replace(/いま \d+ \/ \d+ フレーム目/, `いま ${fl.i + 1} / ${fl.n} フレーム目`);
-      drawMain();
-    }
+    const t = (((ts - fl.t0) / 1000) % 1 + 1) % 1;
+    const k = frameOf(t, fl.fps);
+    fl.t = t;
+    if (k !== fl.idx) { fl.idx = k; markCurrent(); drawMain(); }
     fl.raf = requestAnimationFrame(loop);
   }
-  function startLoop() { if (!fl.raf) { fl.last = null; fl.acc = 0; fl.raf = requestAnimationFrame(loop); } }
-  function stepFrame(d) { fl.playing = false; fl.i = (fl.i + d + fl.n) % fl.n; renderFlip(); }
+  function startLoop() { if (!fl.raf) { fl.t0 = performance.now() - fl.t * 1000; fl.raf = requestAnimationFrame(loop); } }
+  // fps・絵を変えたとき：いまの時刻 t はそのまま，表示するフレームだけ選び直す
+  function resample() { fl.idx = frameOf(fl.t, fl.fps); buildStrip(); renderFlip(); }
+  function stepFrame(d) {
+    fl.playing = false;
+    fl.idx = (fl.idx + d + fl.fps) % fl.fps; fl.t = fl.idx / fl.fps;
+    renderFlip();
+  }
   FPS_CHIPS.forEach((f) => {
     const b = document.createElement("button");
     b.type = "button"; b.className = "chip"; b.dataset.f = f; b.textContent = `${f} fps`;
-    b.addEventListener("click", () => { fl.fps = f; renderFlip(); });
+    b.addEventListener("click", () => { fl.fps = f; resample(); });
     $("#f-fps-chips").appendChild(b);
   });
-  $("#f-fps").addEventListener("input", (e) => { fl.fps = Number(e.target.value); renderFlip(); });
+  $("#f-fps").addEventListener("input", (e) => { fl.fps = Number(e.target.value); resample(); });
   $$("#f-anim button").forEach((b) => b.addEventListener("click", () => { fl.anim = b.dataset.anim; buildStrip(); renderFlip(); }));
   $("#f-play").addEventListener("click", () => { fl.playing = !fl.playing; renderFlip(); });
   $("#f-prev").addEventListener("click", () => stepFrame(-1));
@@ -743,7 +752,7 @@
   Object.assign(cmpA, main); Object.assign(cmpB, main, { fps: Math.min(MAXFPS, main.fps * 2) });
   if (params.get("hide") === "1") { hide = true; $("#hide-num").checked = true; }
 
-  buildN(); buildStrip();
+  buildStrip();
   const tabOf = (id) => tabs.find((t) => t.dataset.hash === id);
   function applyHash() {
     const hash = location.hash.slice(1), t = tabOf(hash);
